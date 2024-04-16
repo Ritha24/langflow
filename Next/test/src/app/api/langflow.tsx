@@ -1,36 +1,38 @@
-import axios, { AxiosError } from 'axios';
-import type { NextApiRequest, NextApiResponse } from 'next';
+import axios from 'axios';
+import { NextApiRequest, NextApiResponse } from 'next';
+import { AxiosError } from 'axios';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
-    const { method, body, query } = req;
-
     try {
-        // Check if the URL property is defined
-        if (req.url) {
-            // Make an axios request to the LangFlow server
-            const langflowResponse = await axios({
-                method: method as any, // Cast method as any to allow it in axios
-                url: `http://localhost:7860${req.url.replace('/api/langflow', '')}`, // Adjust the URL path
-                data: body,
-                params: query,
-            });
+        const { method, body, query } = req;
 
-            // Return the response from the LangFlow server to the client
-            res.status(langflowResponse.status).json(langflowResponse.data);
-        } else {
-            // Handle the case where req.url is undefined
-            res.status(400).json({ error: 'Request URL is undefined' });
-        }
-    } catch (error) {
+        // Define the base URL for the LangFlow server
+        const langflowBaseURL = 'http://127.0.0.1:7860'; // Replace with your LangFlow server URL
+
+        // Forward the request to the LangFlow server
+        const langflowResponse = await axios({
+            method,
+            url: `${langflowBaseURL}${req.url}`, // Forward the entire request URL
+            data: body,
+            params: query,
+        });
+
+        // Return the response from the LangFlow server to the client
+        res.status(langflowResponse.status).json(langflowResponse.data);
+    } catch (error: unknown) {
         // Handle errors
-        if (error instanceof AxiosError) {
-            // If error is an AxiosError, handle it accordingly
+        if (axios.isAxiosError(error)) {
+            // Handle Axios errors
             const status = error.response ? error.response.status : 500;
             const message = error.response ? error.response.data : error.message;
-
             res.status(status).json({ error: message });
+        } else if (error instanceof Error) {
+            // Handle general JavaScript errors
+            console.error('An unexpected error occurred:', error.message);
+            res.status(500).json({ error: error.message });
         } else {
-            // If error is not an AxiosError, handle it as a generic error
+            // Handle other unexpected errors
+            console.error('An unknown error occurred:', error);
             res.status(500).json({ error: 'An unknown error occurred' });
         }
     }
